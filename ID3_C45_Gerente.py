@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from collections import Counter
 from math import log2
 
 # Dados
@@ -30,21 +29,30 @@ def information_gain(df, feature, target):
         weighted_entropy += (len(subset) / len(df)) * entropy(subset[target])
     return base_entropy - weighted_entropy
 
+def gain_ratio(df, feature, target):
+    """Calcula o ganho de informação relativo (gain ratio) de um atributo."""
+    base_entropy = entropy(df[target])
+    feature_values = df[feature].unique()
+    weighted_entropy = 0
+    split_info = 0
+    for value in feature_values:
+        subset = df[df[feature] == value]
+        probability = len(subset) / len(df)
+        weighted_entropy += probability * entropy(subset[target])
+        split_info -= probability * log2(probability)
+    return (base_entropy - weighted_entropy) / split_info if split_info != 0 else 0
+
 def id3(df, features, target):
     """Constrói uma árvore de decisão usando o algoritmo ID3."""
-    # Se todos os exemplos têm a mesma classe, retorna a classe
     if len(df[target].unique()) == 1:
         return df[target].iloc[0]
     
-    # Se não há mais atributos, retorna a classe mais comum
     if not features:
         return df[target].mode().iloc[0]
     
-    # Seleciona o melhor atributo
     gains = [information_gain(df, f, target) for f in features]
     best_feature = features[np.argmax(gains)]
     
-    # Cria a árvore
     tree = {best_feature: {}}
     feature_values = df[best_feature].unique()
     for value in feature_values:
@@ -54,9 +62,35 @@ def id3(df, features, target):
     
     return tree
 
-# Construção da árvore de decisão usando ID3
+def c45(df, features, target):
+    """Constrói uma árvore de decisão usando o algoritmo C4.5."""
+    if len(df[target].unique()) == 1:
+        return df[target].iloc[0]
+    
+    if not features:
+        return df[target].mode().iloc[0]
+    
+    gains = [gain_ratio(df, f, target) for f in features]
+    best_feature = features[np.argmax(gains)]
+    
+    tree = {best_feature: {}}
+    feature_values = df[best_feature].unique()
+    for value in feature_values:
+        subset = df[df[best_feature] == value]
+        remaining_features = [f for f in features if f != best_feature]
+        tree[best_feature][value] = c45(subset, remaining_features, target)
+    
+    return tree
+
 features = ['Historico', 'Divida', 'Garantia', 'Renda']
 target = 'Classe'
+
+# Construção da árvore de decisão usando ID3
 tree_id3 = id3(df, features, target)
 print("Árvore de Decisão ID3:")
 print(tree_id3)
+
+# Construção da árvore de decisão usando C4.5
+tree_c45 = c45(df, features, target)
+print("Árvore de Decisão C4.5:")
+print(tree_c45)
